@@ -2,12 +2,11 @@ name: Deploy Application Docker Image to EC2 instance
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
   Continuous-Integration:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -24,7 +23,6 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build, tag, and push image to Amazon ECR
-        id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.ECR_REPO }}
@@ -32,14 +30,12 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
   Continuous-Deployment:
     needs: Continuous-Integration
     runs-on: self-hosted
-
     steps:
-      - name: Checkout (no code used, but keeps workspace clean)
+      - name: Checkout (keep workspace clean)
         uses: actions/checkout@v3
 
       - name: Configure AWS credentials
@@ -54,24 +50,34 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Run Docker Image to serve users
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.ECR_REPO }}
         run: |
-          IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPO }}:latest"
+          set -e
+          IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY:latest"
+          CONTAINER="medicalbot-web"
 
-          # stop & remove any old container
-          docker rm -f medicalbot || true
-
-          # pull latest image
+          # pull the latest
           docker pull "$IMAGE"
 
-          # run with env + map port 80 -> 8080 in the container
-          docker run -d \
-            --name medicalbot \
-            --restart unless-stopped \
-            -p 80:8080 \
-            -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
-            -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-            -e AWS_DEFAULT_REGION="${{ secrets.AWS_DEFAULT_REGION }}" \
+          # stop & remove any previous container with this name
+          if [ "$(docker ps -aq -f name=$CONTAINER)" ]; then
+            docker rm -f "$CONTAINER" || true
+          fi
+
+          # free port 80 if some other container grabbed it
+          OCCUPANT="$(docker ps --format '{{.ID}} {{.Names}} {{.Ports}}' | grep ':80->' | awk '{print $1}')"
+          if [ -n "$OCCUPANT" ]; then docker rm -f "$OCCUPANT" || true; fi
+
+          # run new container (maps 80 on host to 8080 in container)
+          docker run -d --restart unless-stopped \
+            --name "$CONTAINER" \
             -e PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
             -e GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
-            -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            -p 80:8080 \
             "$IMAGE"
+
+          # show status
+          sleep 2
+          docker ps --filter "name=$CONTAINER"

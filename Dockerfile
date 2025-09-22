@@ -1,17 +1,19 @@
 FROM python:3.10-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 WORKDIR /app
+COPY requirements.txt /app/requirements.txt
 
-# (optional but useful for many wheels)
+# Build deps for some wheels (rapidfuzz/Levenshtein can compile)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential curl && \
-    rm -rf /var/lib/apt/lists/*
+    build-essential git && \
+    pip install --no-cache-dir -r requirements.txt && \
+    apt-get purge -y build-essential git && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
+COPY . /app
 
 EXPOSE 8080
-CMD ["python", "app.py"]
-
+# production server
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:8080", "app:app"]
