@@ -1,9 +1,17 @@
-FROM python:3.10-slim-buster
+FROM python:3.10-slim
 
 WORKDIR /app
 
-COPY . /app
+# (optional but useful for many wheels)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN pip install -r requirements.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["python3", "app.py"]
+COPY . .
+
+EXPOSE 8080
+CMD ["python", "app.py"]
+
