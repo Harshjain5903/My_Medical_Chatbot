@@ -1,22 +1,17 @@
 flask==3.1.1
 python-dotenv==1.1.0
 
-# LangChain & integrations
+# LangChain ecosystem
 langchain==0.3.26
 langchain-community==0.3.26
 langchain-pinecone==0.2.8
-langchain-groq==0.1.5
-langchain-huggingface==0.1.2
+langchain-openai==0.3.24
+langchain-groq
+langchain-huggingface
 
-# Vector/embeddings/pdfs
-sentence-transformers==3.2.1
+# RAG helpers
+sentence-transformers==4.1.0
 pypdf==5.6.1
-
-# Utils for robustness
-rapidfuzz==3.9.7          # fast fuzzy matching/typo tolerance
-textdistance==4.6.2       # you already used this; keep it
 numpy>=2.1.0
 scikit-learn==1.5.2
-
-# production web server
-gunicorn==22.0.0
+textdistance==4.6.2
